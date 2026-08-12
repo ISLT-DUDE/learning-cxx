@@ -10,6 +10,10 @@ struct Tensor4D {
     Tensor4D(unsigned int const shape_[4], T const *data_) {
         unsigned int size = 1;
         // TODO: 填入正确的 shape 并计算 size
+        for (int i = 0; i < 4; i++) {
+            shape[i] = shape_[i];
+            size *= shape_[i];
+        }
         data = new T[size];
         std::memcpy(data, data_, size * sizeof(T));
     }
@@ -21,13 +25,32 @@ struct Tensor4D {
     Tensor4D(Tensor4D const &) = delete;
     Tensor4D(Tensor4D &&) noexcept = delete;
 
-    // 这个加法需要支持“单向广播”。
+    // 这个加法需要支持"单向广播"。
     // 具体来说，`others` 可以具有与 `this` 不同的形状，形状不同的维度长度必须为 1。
     // `others` 长度为 1 但 `this` 长度不为 1 的维度将发生广播计算。
     // 例如，`this` 形状为 `[1, 2, 3, 4]`，`others` 形状为 `[1, 2, 1, 4]`，
     // 则 `this` 与 `others` 相加时，3 个形状为 `[1, 2, 1, 4]` 的子张量各自与 `others` 对应项相加。
     Tensor4D &operator+=(Tensor4D const &others) {
         // TODO: 实现单向广播的加法
+        unsigned int total = shape[0] * shape[1] * shape[2] * shape[3];
+        for (unsigned int flat = 0; flat < total; flat++) {
+            // Compute 4D indices from flat index
+            unsigned int remaining = flat;
+            unsigned int idx[4];
+            for (int d = 3; d >= 0; d--) {
+                idx[d] = remaining % shape[d];
+                remaining /= shape[d];
+            }
+            // Compute flat index in others using broadcasting
+            unsigned int other_flat = 0;
+            unsigned int other_stride = 1;
+            for (int d = 3; d >= 0; d--) {
+                unsigned int other_idx = (others.shape[d] == 1) ? 0 : idx[d];
+                other_flat += other_idx * other_stride;
+                other_stride *= others.shape[d];
+            }
+            data[flat] += others.data[other_flat];
+        }
         return *this;
     }
 };
